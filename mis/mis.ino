@@ -86,6 +86,11 @@ void setup() {
 
 void loop() {
 
+
+  // ---- WIFI CHECK ----
+
+  checkWiFi();
+
   // ---- TOGGLE BUTTON LOGIC ----
   int reading = digitalRead(BUTTON);
 
@@ -98,9 +103,6 @@ void loop() {
 
   lastButtonState = reading;
 
-  // ---- WIFI CHECK ----
-
-  checkWiFi();
 
   // ---- RFID SCAN ----
   if (!rfid.PICC_IsNewCardPresent()) return;
@@ -116,36 +118,69 @@ void loop() {
   uidStr.toUpperCase();
   Serial.println("Scanned UID: " + uidStr);
 
-  // JSON payload
-  String json = "{\"rfid\":\"" + uidStr + "\"}";
+  if (yellowState) {
+    // JSON payload
+    String json = "{\"rfid\":\"" + uidStr + "\"}";
 
-  // Send to API
-  if (client.connect(serverIP, serverPort)) {
-    client.println("POST /api/scan HTTP/1.1");
-    client.println("Host: 10.238.161.131:8000");
-    client.println("Content-Type: application/json");
-    client.print("Content-Length: ");
-    client.println((int)json.length());
-    client.println();
-    client.println(json);
+    // Send to API
+    if (client.connect(serverIP, serverPort)) {
+      client.println("POST /api/scan HTTP/1.1");
+      client.println("Host: 10.238.161.131:8000");
+      client.println("Content-Type: application/json");
+      client.print("Content-Length: ");
+      client.println((int)json.length());
+      client.println();
+      client.println(json);
 
-    unsigned long timeout = millis();
-    while (client.connected() && !client.available()) {
-      if (millis() - timeout > 5000) break;
-      delay(10);
+      unsigned long timeout = millis();
+      while (client.connected() && !client.available()) {
+        if (millis() - timeout > 5000) break;
+        delay(10);
+      }
+
+      while (client.available()) {
+        String line = client.readStringUntil('\n');
+        Serial.println(line);
+      }
+
+      client.stop();
+      Serial.println("POST complete.\n");
+    } else {
+      Serial.println("Connection to server failed");
     }
-
-    while (client.available()) {
-      String line = client.readStringUntil('\n');
-      Serial.println(line);
-    }
-
-    client.stop();
-    Serial.println("POST complete.\n");
   } else {
-    Serial.println("Connection to server failed");
-  }
+    Serial.println("YELLOW OFF → sending POST /api/rfid/scan with UID");
 
+    // Build POST body
+    String postData = "rfid=" + uidStr;
+
+    if (client.connect(serverIP, serverPort)) {
+      client.println("POST /api/rfid/scan HTTP/1.1");
+      client.println("Host: 10.238.161.131:8000");
+      client.println("Content-Type: application/x-www-form-urlencoded");
+      client.print("Content-Length: ");
+      client.println(postData.length());
+      client.println();
+      client.println(postData);
+
+      unsigned long timeout = millis();
+      while (client.connected() && !client.available()) {
+        if (millis() - timeout > 5000) break;
+        delay(10);
+      }
+
+      while (client.available()) {
+        String line = client.readStringUntil('\n');
+        Serial.println(line);
+      }
+
+      client.stop();
+      Serial.println("POST /api/rfid/scan complete.\n");
+
+    } else {
+      Serial.println("Connection to server failed (POST /api/rfid/scan)");
+    }
+  }
   rfid.PICC_HaltA();
   delay(1000);
 }
