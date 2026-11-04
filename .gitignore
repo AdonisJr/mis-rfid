@@ -1,0 +1,7 @@
+
+# workspace symlinks (machine-specific, created by setup-links)
+.claude/common
+.claude/diagrams
+
+# device secrets (Wi-Fi, server host, tokens) — copy arduino_secrets.h.example
+mis/arduino_secrets.h
